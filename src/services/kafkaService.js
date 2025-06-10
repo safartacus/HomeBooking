@@ -5,7 +5,7 @@ const { sendWhatsApp } = require('./smsService');
 
 const kafka = new Kafka({
   clientId: 'home-booking-app',
-  brokers: [process.env.KAFKA_BROKER || 'localhost:9094']
+  brokers: [process.env.KAFKA_BROKER || '157.180.85.118:32001']
 });
 
 const producer = kafka.producer();

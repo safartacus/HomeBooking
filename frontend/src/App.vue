@@ -1,7 +1,7 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import axios from 'axios'
+import api from '@/api' 
 
 const router = useRouter()
 const isAuthenticated = computed(() => {
@@ -16,10 +16,10 @@ const fetchProfileAndNotifications = async () => {
   try {
     const token = localStorage.getItem('token')
     const [profileRes, notifRes] = await Promise.all([
-      axios.get('http://localhost:3000/api/profiles/me', {
+      api.get('/profiles/me', {
         headers: { Authorization: `Bearer ${token}` }
       }),
-      axios.get('http://localhost:3000/api/notifications', {
+      api.get('/notifications', {
         headers: { Authorization: `Bearer ${token}` }
       })
     ])
