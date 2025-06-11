@@ -3,13 +3,14 @@ import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import socket from './socket'
+import { useNotificationStore } from './stores/notification'
 
+const notificationStore = useNotificationStore()
 const router = useRouter()
 const isAuthenticated = computed(() => {
   return !!localStorage.getItem('token')
 })
 const profilePicture = ref('')
-const unreadCount = ref(0)
 const showProfileMenu = ref(false)
 const userId = ref(null)
 
@@ -17,29 +18,20 @@ const fetchProfileAndNotifications = async () => {
   if (!isAuthenticated.value) return
   try {
     const token = localStorage.getItem('token')
-    const [profileRes, notifRes] = await Promise.all([
-      api.get('/profiles/me', {
-        headers: { Authorization: `Bearer ${token}` }
-      }),
-      api.get('/notifications', {
-        headers: { Authorization: `Bearer ${token}` }
-      })
-    ])
+    const profileRes = await api.get('/profiles/me', {
+      headers: { Authorization: `Bearer ${token}` }
+    })
     profilePicture.value = profileRes.data.profilePicture
-    unreadCount.value = notifRes.data.notifications.filter(n => !n.isRead).length
     userId.value = profileRes.data._id
-    // Kullanıcı login olduysa socket'e register et
     socket.emit('register', userId.value)
+    await notificationStore.fetchNotifications()
   } catch {}
 }
 
 onMounted(() => {
   fetchProfileAndNotifications()
-  // Bildirim eventini dinle
-  socket.on('notification', (notif) => {
-    unreadCount.value++
-    // İstersen burada toast veya başka bir gösterim ekleyebilirsin
-    // örn: alert('Yeni bildirim: ' + notif.data.message)
+  socket.on('notification', () => {
+    notificationStore.incrementUnread()
   })
 })
 
@@ -73,7 +65,7 @@ const handleProfileMenuBlur = (e) => {
         <div class="nav-right">
           <div class="notif-icon" @click="router.push('/notifications')">
             <span class="icon">🔔</span>
-            <span v-if="unreadCount > 0" class="notif-badge">{{ unreadCount }}</span>
+            <span v-if="notificationStore.unreadCount > 0" class="notif-badge">{{ notificationStore.unreadCount }}</span>
           </div>
           <div class="profile-menu-wrapper" tabindex="0" @blur="handleProfileMenuBlur">
             <img v-if="profilePicture" :src="profilePicture" class="profile-avatar" @click="handleProfileClick" />

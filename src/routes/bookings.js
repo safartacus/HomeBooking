@@ -26,16 +26,25 @@ const auth = async (req, res, next) => {
 // Get all bookings for current user
 router.get('/', auth, async (req, res) => {
   try {
-    const bookings = await Booking.find({
-      $or: [{ guest: req.user._id }, { host: req.user._id }]
+    const userId = req.user._id;
+    // Yaklaşan randevular (pending veya approved)
+    const asHost = await Booking.find({
+      host: userId,
+      status: { $in: ['pending', 'approved'] }
     })
-    .populate('guest', 'username')
-    .populate('host', 'username')
-    .sort({ startDate: 1 });
+      .populate('guest', 'username')
+      .populate('host', 'username')
+      .sort({ startDate: 1 });
 
-    const isHost = bookings.some(booking => booking.host._id.toString() === req.user._id.toString());
+    const asGuest = await Booking.find({
+      guest: userId,
+      status: { $in: ['pending', 'approved'] }
+    })
+      .populate('guest', 'username')
+      .populate('host', 'username')
+      .sort({ startDate: 1 });
 
-    res.json({ bookings, isHost });
+    res.json({ asHost, asGuest });
   } catch (error) {
     res.status(500).json({ message: 'Randevular yüklenirken bir hata oluştu' });
   }

@@ -22,49 +22,66 @@
         <div v-if="loading" class="loading">
           Yükleniyor...
         </div>
-        
-        <div v-else-if="filteredBookings.length === 0" class="no-bookings">
-          {{ activeTab === 'upcoming' ? 'Yaklaşan randevu bulunmuyor' : 'Geçmiş randevu bulunmuyor' }}
-        </div>
 
-        <div v-else class="booking-cards">
-          <div v-for="booking in filteredBookings" :key="booking._id" class="booking-card">
-            <div class="booking-header">
-              <h3>{{ booking.guest.username }}</h3>
-              <span :class="['status', booking.status]">
-                {{ getStatusText(booking.status) }}
-              </span>
-            </div>
+        <template v-if="activeTab === 'upcoming'">
+          <div class="sub-tabs">
+            <button
+              :class="['sub-tab-btn', { active: upcomingTab === 'asHost' }]"
+              @click="upcomingTab = 'asHost'"
+            >
+              Bana Gelecekler
+            </button>
+            <button
+              :class="['sub-tab-btn', { active: upcomingTab === 'asGuest' }]"
+              @click="upcomingTab = 'asGuest'"
+            >
+              Benim Gideceklerim
+            </button>
+          </div>
 
-            <div class="booking-dates">
-              <p>
-                <strong>Başlangıç:</strong>
-                {{ formatDate(booking.startDate) }}
-              </p>
-              <p>
-                <strong>Bitiş:</strong>
-                {{ formatDate(booking.endDate) }}
-              </p>
-            </div>
-
-            <p class="booking-message">{{ booking.message }}</p>
-
-            <div v-if="isHost && booking.status === 'pending'" class="booking-actions">
-              <button
-                class="btn approve"
-                @click="updateBookingStatus(booking._id, 'approved')"
-              >
-                Onayla
-              </button>
-              <button
-                class="btn reject"
-                @click="updateBookingStatus(booking._id, 'rejected')"
-              >
-                Reddet
-              </button>
+          <div v-if="upcomingTab === 'asHost'">
+            <div v-if="asHost.length === 0" class="no-bookings">Hiç yaklaşan randevu yok.</div>
+            <div v-for="booking in asHost" :key="booking._id" class="booking-card">
+              <div class="booking-header">
+                <h3>{{ booking.guest.username }}</h3>
+                <span :class="['status', booking.status]">
+                  {{ getStatusText(booking.status) }}
+                </span>
+              </div>
+              <div class="booking-dates">
+                <p><strong>Başlangıç:</strong> {{ formatDate(booking.startDate) }}</p>
+                <p><strong>Bitiş:</strong> {{ formatDate(booking.endDate) }}</p>
+              </div>
+              <p class="booking-message">{{ booking.message }}</p>
+              <div v-if="booking.status === 'pending'" class="booking-actions">
+                <button class="btn approve" @click="updateBookingStatus(booking._id, 'approved')">Onayla</button>
+                <button class="btn reject" @click="updateBookingStatus(booking._id, 'rejected')">Reddet</button>
+              </div>
             </div>
           </div>
-        </div>
+
+          <div v-else>
+            <div v-if="asGuest.length === 0" class="no-bookings">Hiç yaklaşan randevu yok.</div>
+            <div v-for="booking in asGuest" :key="booking._id" class="booking-card">
+              <div class="booking-header">
+                <h3>{{ booking.host.username }}</h3>
+                <span :class="['status', booking.status]">
+                  {{ getStatusText(booking.status) }}
+                </span>
+              </div>
+              <div class="booking-dates">
+                <p><strong>Başlangıç:</strong> {{ formatDate(booking.startDate) }}</p>
+                <p><strong>Bitiş:</strong> {{ formatDate(booking.endDate) }}</p>
+              </div>
+              <p class="booking-message">{{ booking.message }}</p>
+            </div>
+          </div>
+        </template>
+
+        <template v-else>
+          <!-- Geçmiş randevular eski haliyle kalsın -->
+          <div class="no-bookings">Geçmiş randevu bulunmuyor</div>
+        </template>
       </div>
 
       <div class="error" v-if="error">
@@ -78,27 +95,12 @@
 import { ref, computed, onMounted } from 'vue'
 import api from '@/api'
 
-const bookings = ref([])
+const asHost = ref([])
+const asGuest = ref([])
 const loading = ref(true)
 const error = ref('')
 const activeTab = ref('upcoming')
-const isHost = ref(false)
-
-const filteredBookings = computed(() => {
-  const now = new Date()
-  // Sort by createdAt (newest first), fallback to startDate if createdAt is missing
-  const sorted = [...bookings.value].sort((a, b) => {
-    const aTime = a.createdAt ? new Date(a.createdAt) : new Date(a.startDate)
-    const bTime = b.createdAt ? new Date(b.createdAt) : new Date(b.startDate)
-    return bTime - aTime
-  })
-  return sorted.filter(booking => {
-    const startDate = new Date(booking.startDate)
-    return activeTab.value === 'upcoming'
-      ? startDate >= now
-      : startDate < now
-  })
-})
+const upcomingTab = ref('asHost')
 
 const fetchBookings = async () => {
   try {
@@ -106,9 +108,8 @@ const fetchBookings = async () => {
     const response = await api.get('/bookings', {
       headers: { Authorization: `Bearer ${token}` }
     })
-
-    bookings.value = response.data.bookings
-    isHost.value = response.data.isHost
+    asHost.value = response.data.asHost
+    asGuest.value = response.data.asGuest
   } catch (err) {
     error.value = 'Randevular yüklenirken bir hata oluştu'
   } finally {
@@ -124,7 +125,6 @@ const updateBookingStatus = async (bookingId, status) => {
       { status },
       { headers: { Authorization: `Bearer ${token}` } }
     )
-
     await fetchBookings()
   } catch (err) {
     error.value = 'Randevu durumu güncellenirken bir hata oluştu'
@@ -197,6 +197,27 @@ h1 {
   transition: background-color 0.3s;
 }
 .tab-btn.active {
+  background: #42b983;
+  color: white;
+}
+.sub-tabs {
+  display: flex;
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+  justify-content: center;
+}
+.sub-tab-btn {
+  flex: 1;
+  padding: 0.7rem;
+  border: none;
+  border-radius: 6px;
+  background: #f5f5f5;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 1rem;
+  transition: background-color 0.3s;
+}
+.sub-tab-btn.active {
   background: #42b983;
   color: white;
 }
