@@ -1,15 +1,18 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv');
+const dotenv = require('dotenv').config();
 const path = require('path');
+const http = require('http');
+const { Server } = require('socket.io');
 const authRoutes = require('./routes/auth');
 const bookingRoutes = require('./routes/bookings');
 const profileRoutes = require('./routes/profiles');
 const cloudinary = require('./utils/cloudinary');
 const notificationRoutes = require('./routes/notifications');
 const notificationService = require('./services/kafkaService');
-dotenv.config();
+const startConsumer = require('./services/kafkaConsumer');
+
 notificationService.connect();
 const app = express();
 
@@ -17,7 +20,6 @@ const app = express();
 app.use(cors());
 app.use(express.json());
 app.use('/uploads', express.static(path.join(__dirname, '../uploads')));
-
 
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -36,9 +38,31 @@ mongoose.connect(process.env.MONGODB_URI)
   .then(() => console.log('Connected to MongoDB'))
   .catch((err) => console.error('MongoDB connection error:', err));
 
+const server = http.createServer(app);
+const io = new Server(server, {
+  cors: { origin: '*' }
+});
 
+const userSockets = new Map();
+
+io.on('connection', (socket) => {
+  socket.on('register', (userId) => {
+    userSockets.set(userId, socket.id);
+  });
+
+  socket.on('disconnect', () => {
+    for (const [userId, id] of userSockets.entries()) {
+      if (id === socket.id) userSockets.delete(userId);
+    }
+  });
+});
 
 const PORT = process.env.PORT || 3000;
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`Server is running on port ${PORT}`);
-}); 
+});
+
+module.exports = { io, userSockets };
+
+// Kafka consumer başlat
+startConsumer().catch(err => console.error('Kafka consumer error:', err)); 

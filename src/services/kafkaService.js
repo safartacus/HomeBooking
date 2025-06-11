@@ -2,12 +2,18 @@ const { Kafka } = require('kafkajs');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendWhatsApp } = require('./smsService');
+const fs = require('fs');
 
 const kafka = new Kafka({
   clientId: 'home-booking-app',
-  brokers: [process.env.KAFKA_BROKER || '157.180.85.118:32001']
+  brokers: [process.env.KAFKA_BROKER],
+  ssl: {
+    rejectUnauthorized: true,
+    ca: [fs.readFileSync(process.env.KAFKA_CA_PATH, 'utf-8')],
+    key: fs.readFileSync(process.env.KAFKA_KEY_PATH, 'utf-8'),
+    cert: fs.readFileSync(process.env.KAFKA_CERT_PATH, 'utf-8'),
+  }
 });
-
 const producer = kafka.producer();
 
 const notificationService = {

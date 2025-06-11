@@ -1,7 +1,8 @@
 <script setup>
 import { computed, ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
-import api from '@/api' 
+import api from '@/api'
+import socket from './socket'
 
 const router = useRouter()
 const isAuthenticated = computed(() => {
@@ -10,6 +11,7 @@ const isAuthenticated = computed(() => {
 const profilePicture = ref('')
 const unreadCount = ref(0)
 const showProfileMenu = ref(false)
+const userId = ref(null)
 
 const fetchProfileAndNotifications = async () => {
   if (!isAuthenticated.value) return
@@ -25,10 +27,21 @@ const fetchProfileAndNotifications = async () => {
     ])
     profilePicture.value = profileRes.data.profilePicture
     unreadCount.value = notifRes.data.notifications.filter(n => !n.isRead).length
+    userId.value = profileRes.data._id
+    // Kullanıcı login olduysa socket'e register et
+    socket.emit('register', userId.value)
   } catch {}
 }
 
-onMounted(fetchProfileAndNotifications)
+onMounted(() => {
+  fetchProfileAndNotifications()
+  // Bildirim eventini dinle
+  socket.on('notification', (notif) => {
+    unreadCount.value++
+    // İstersen burada toast veya başka bir gösterim ekleyebilirsin
+    // örn: alert('Yeni bildirim: ' + notif.data.message)
+  })
+})
 
 const handleLogout = () => {
   localStorage.removeItem('token')
