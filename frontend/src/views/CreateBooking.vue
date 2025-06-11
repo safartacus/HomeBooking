@@ -29,9 +29,9 @@
           v-model="dateRange"
           :range="true"
           :min-date="new Date()"
-          :highlighted="highlightedDates"
           :disabled-dates="disabledDates"
           :locale="'tr'"
+          :dayClass="getDayClass"
           @update:model-value="onDateChange"
         />
         <div class="legend">
@@ -51,6 +51,13 @@
             required
             placeholder="Ev sahibine mesajınız"
           ></textarea>
+        </div>
+        <div class="form-group">
+          <label>Geliş Durumu</label>
+          <div class="checkbox-group">
+            <label><input type="radio" value="Elim boş geleceğim" v-model="arrivalType" required> Elim boş geleceğim</label>
+            <label><input type="radio" value="Elim dolu geleceğim" v-model="arrivalType"> Elim dolu geleceğim</label>
+          </div>
         </div>
         <div class="error" v-if="error">{{ error }}</div>
         <div class="success" v-if="success">{{ success }}</div>
@@ -85,6 +92,7 @@ const dateRange = ref([today, tomorrow])
 const highlightedDates = ref([])
 const disabledDates = ref([])
 const canSubmit = ref(false)
+const arrivalType = ref('Elim boş geleceğim')
 
 // Kullanıcı arama
 const searchUsers = async () => {
@@ -133,19 +141,18 @@ const fetchUserBookings = async () => {
     })
     // Sadece seçili kullanıcının host olduğu ve pending/approved olan randevular
     const bookings = res.data.bookings.filter(b => b.host._id === selectedUser.value._id && ['pending','approved'].includes(b.status))
-    // Dolu günleri hesapla
-    let highlighted = []
+    let busy = []
     bookings.forEach(b => {
       const start = new Date(b.startDate)
       const end = new Date(b.endDate)
       for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        highlighted.push({ date: new Date(d), class: 'busy-day' })
+        busy.push(new Date(d))
       }
     })
-    highlightedDates.value = highlighted
+    busyDays.value = busy
     disabledDates.value = []
   } catch {
-    highlightedDates.value = []
+    busyDays.value = []
     disabledDates.value = []
   }
 }
@@ -202,13 +209,15 @@ const handleCreateBooking = async () => {
       hostId: selectedUser.value._id,
       startDate: dateRange.value[0],
       endDate: dateRange.value[1],
-      message: message.value
+      message: message.value,
+      arrivalType: arrivalType.value
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })
     success.value = 'Randevu talebiniz gönderildi!'
     dateRange.value = [today, tomorrow]
     message.value = ''
+    arrivalType.value = 'Elim boş geleceğim'
     canSubmit.value = false
     fetchUserBookings()
   } catch (err) {
@@ -217,6 +226,19 @@ const handleCreateBooking = async () => {
     loading.value = false
   }
 }
+
+// busy-day ve free-day için günlere class ekle
+function getDayClass({ date }) {
+  // busy-day: dolu günler
+  const isBusy = busyDays.value.some(d => sameDay(new Date(date), d))
+  if (isBusy) return 'busy-day'
+  // free-day: bugünden sonraki ve dolu olmayan günler
+  if (selectedUser.value && new Date(date) > today) return 'free-day'
+  return ''
+}
+
+// busyDays arrayini doldur
+const busyDays = ref([])
 </script>
 
 <style scoped>
@@ -365,6 +387,11 @@ textarea {
   color: #fff !important;
   border-radius: 50% !important;
 }
+.free-day {
+  background: #28a745 !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+}
 .legend {
   display: flex;
   gap: 1.5rem;
@@ -390,6 +417,16 @@ textarea {
 .legend-box.free {
   background: #42b983;
 }
+.dp__cell.busy-day .dp__cell_inner {
+  background: #dc3545 !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+}
+.dp__cell.free-day .dp__cell_inner {
+  background: #28a745 !important;
+  color: #fff !important;
+  border-radius: 50% !important;
+}
 @media (max-width: 700px) {
   .create-booking-container {
     max-width: 98vw;
@@ -407,5 +444,15 @@ textarea {
     width: 28px;
     height: 28px;
   }
+}
+.checkbox-group {
+  display: flex;
+  gap: 2rem;
+  margin-top: 0.5rem;
+}
+.checkbox-group label {
+  font-weight: 400;
+  color: #2c3e50;
+  font-size: 1rem;
 }
 </style> 

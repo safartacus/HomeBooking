@@ -64,7 +64,7 @@ const notificationService = {
       const notification = new Notification({
         userId: recipient._id,
         type: 'booking_request',
-        message: `${booking.senderId.username} size randevu oluşturdu`,
+        message: `${booking.senderId.username} size randevu oluşturdu. Geliş durumu: ${booking.arrivalType}`,
         bookingId: booking._id
       });
       await notification.save();
@@ -86,6 +86,7 @@ const notificationService = {
           <li>Tarih: ${new Date(booking.date).toLocaleDateString('tr-TR')}</li>
           <li>Saat: ${booking.time}</li>
           <li>Açıklama: ${booking.description}</li>
+          <li>Geliş Durumu: ${booking.arrivalType}</li>
         </ul>
         <p>Randevuyu görüntülemek ve yanıtlamak için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
       `;

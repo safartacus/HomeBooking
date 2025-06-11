@@ -53,7 +53,7 @@ router.get('/', auth, async (req, res) => {
 // Create new booking
 router.post('/', auth, async (req, res) => {
   try {
-    const { hostId, startDate, endDate, message } = req.body;
+    const { hostId, startDate, endDate, message, arrivalType } = req.body;
 
     // Validate dates
     if (new Date(startDate) >= new Date(endDate)) {
@@ -72,7 +72,8 @@ router.post('/', auth, async (req, res) => {
       host: hostId,
       startDate,
       endDate,
-      message
+      message,
+      arrivalType
     });
 
     await booking.save();

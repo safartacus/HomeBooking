@@ -53,6 +53,7 @@
                 <p><strong>Bitiş:</strong> {{ formatDate(booking.endDate) }}</p>
               </div>
               <p class="booking-message">{{ booking.message }}</p>
+              <p class="booking-arrival"><strong>Geliş Durumu:</strong> {{ booking.arrivalType }}</p>
               <div v-if="booking.status === 'pending'" class="booking-actions">
                 <button class="btn approve" @click="updateBookingStatus(booking._id, 'approved')">Onayla</button>
                 <button class="btn reject" @click="updateBookingStatus(booking._id, 'rejected')">Reddet</button>
@@ -74,6 +75,7 @@
                 <p><strong>Bitiş:</strong> {{ formatDate(booking.endDate) }}</p>
               </div>
               <p class="booking-message">{{ booking.message }}</p>
+              <p class="booking-arrival"><strong>Geliş Durumu:</strong> {{ booking.arrivalType }}</p>
             </div>
           </div>
         </template>
@@ -272,6 +274,11 @@ h1 {
   font-size: 1rem;
 }
 .booking-message {
+  color: #666;
+  margin-bottom: 0.7rem;
+  font-size: 1rem;
+}
+.booking-arrival {
   color: #666;
   margin-bottom: 0.7rem;
   font-size: 1rem;

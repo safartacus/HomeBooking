@@ -28,6 +28,12 @@ const bookingSchema = new mongoose.Schema({
     type: String,
     required: true
   },
+  arrivalType: {
+    type: String,
+    enum: ['Elim boş geleceğim', 'Elim dolu geleceğim'],
+    default: 'Elim boş geleceğim',
+    required: true
+  },
   createdAt: {
     type: Date,
     default: Date.now
