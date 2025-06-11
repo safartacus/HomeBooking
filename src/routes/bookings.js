@@ -143,4 +143,91 @@ router.get('/availability', auth, async (req, res) => {
   }
 });
 
+// Randevu oluştur
+router.post('/', auth, async (req, res) => {
+  try {
+    const { recipientId, date, time, description } = req.body;
+
+    // Randevu alan kişiyi kontrol et
+    const recipient = await User.findById(recipientId);
+    if (!recipient) {
+      return res.status(404).json({ message: 'Randevu alan kişi bulunamadı' });
+    }
+
+    // Randevu oluştur
+    const booking = new Booking({
+      senderId: req.user._id,
+      recipientId,
+      date,
+      time,
+      description,
+      status: 'pending'
+    });
+
+    await booking.save();
+
+    // Bildirim gönder
+    await notificationService.sendBookingNotification(booking);
+
+    res.status(201).json({
+      message: 'Randevu başarıyla oluşturuldu',
+      booking
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// Randevu onayla/reddet
+router.patch('/:id/status', auth, async (req, res) => {
+  try {
+    const { status } = req.body;
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Randevu bulunamadı' });
+    }
+
+    // Sadece randevu alan kişi onaylayabilir/reddedebilir
+    if (booking.recipientId.toString() !== req.user._id.toString()) {
+      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+    }
+
+    booking.status = status;
+    await booking.save();
+
+    // Onaylandıysa bildirim gönder
+    if (status === 'approved') {
+      await notificationService.sendBookingApprovalNotification(booking);
+    }
+
+    res.json({
+      message: `Randevu ${status === 'approved' ? 'onaylandı' : 'reddedildi'}`,
+      booking
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// Kullanıcının randevularını getir
+router.get('/my-bookings', auth, async (req, res) => {
+  try {
+    const sentBookings = await Booking.find({ senderId: req.user._id })
+      .populate('recipientId', 'username email profilePicture')
+      .sort({ date: -1 });
+
+    const receivedBookings = await Booking.find({ recipientId: req.user._id })
+      .populate('senderId', 'username email profilePicture')
+      .sort({ date: -1 });
+
+    res.json({
+      sentBookings,
+      receivedBookings
+    });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
 module.exports = router; 

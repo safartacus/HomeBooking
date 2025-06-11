@@ -2,7 +2,7 @@
   <div class="login">
     <div class="login-container">
       <h1>Giriş Yap</h1>
-      <form @submit.prevent="handleLogin">
+      <form @submit.prevent="handleLogin" v-if="!showOtpForm">
         <div class="form-group">
           <label for="email">E-posta</label>
           <input
@@ -34,6 +34,32 @@
         </button>
       </form>
 
+      <form @submit.prevent="handleOtpVerification" v-else>
+        <div class="form-group">
+          <label for="otp">Doğrulama Kodu</label>
+          <input
+            type="text"
+            id="otp"
+            v-model="otp"
+            required
+            placeholder="E-posta adresinize gönderilen kodu girin"
+            maxlength="6"
+          >
+        </div>
+
+        <div class="error" v-if="error">
+          {{ error }}
+        </div>
+
+        <button type="submit" class="btn primary" :disabled="loading">
+          {{ loading ? 'Doğrulanıyor...' : 'Doğrula' }}
+        </button>
+
+        <button type="button" class="btn secondary" @click="resendOtp" :disabled="loading">
+          Kodu Tekrar Gönder
+        </button>
+      </form>
+
       <p class="register-link">
         Hesabınız yok mu? <router-link to="/register">Kayıt Ol</router-link>
       </p>
@@ -49,8 +75,10 @@ import api from '@/api'
 const router = useRouter()
 const email = ref('')
 const password = ref('')
+const otp = ref('')
 const error = ref('')
 const loading = ref(false)
+const showOtpForm = ref(false)
 
 const handleLogin = async () => {
   try {
@@ -62,10 +90,46 @@ const handleLogin = async () => {
       password: password.value
     })
 
+    showOtpForm.value = true
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Giriş yapılırken bir hata oluştu'
+  } finally {
+    loading.value = false
+  }
+}
+
+const handleOtpVerification = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+    
+    const response = await api.post('/auth/verify-otp', {
+      email: email.value,
+      otp: otp.value
+    })
+
     localStorage.setItem('token', response.data.token)
     router.push('/profile')
   } catch (err) {
-    error.value = err.response?.data?.message || 'Giriş yapılırken bir hata oluştu'
+    error.value = err.response?.data?.message || 'Doğrulama sırasında bir hata oluştu'
+  } finally {
+    loading.value = false
+  }
+}
+
+const resendOtp = async () => {
+  try {
+    loading.value = true
+    error.value = ''
+    
+    await api.post('/auth/login', {
+      email: email.value,
+      password: password.value
+    })
+
+    error.value = 'Yeni doğrulama kodu gönderildi'
+  } catch (err) {
+    error.value = err.response?.data?.message || 'Kod gönderilirken bir hata oluştu'
   } finally {
     loading.value = false
   }
@@ -153,5 +217,11 @@ input {
 
 .register-link a:hover {
   text-decoration: underline;
+}
+
+.secondary {
+  background: #6c757d;
+  color: white;
+  margin-top: 1rem;
 }
 </style> 

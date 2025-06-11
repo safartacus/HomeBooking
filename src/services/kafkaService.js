@@ -2,6 +2,7 @@ const { Kafka } = require('kafkajs');
 const Notification = require('../models/Notification');
 const User = require('../models/User');
 const { sendWhatsApp } = require('./smsService');
+const nodemailer = require('nodemailer');
 const fs = require('fs');
 
 const kafka = new Kafka({
@@ -14,7 +15,34 @@ const kafka = new Kafka({
     cert: fs.readFileSync(process.env.KAFKA_CERT_PATH, 'utf-8'),
   }
 });
+
 const producer = kafka.producer();
+
+// E-posta gönderimi için transporter
+const transporter = nodemailer.createTransport({
+  service: 'gmail',
+  auth: {
+    user: process.env.EMAIL_USER,
+    pass: process.env.EMAIL_PASSWORD
+  }
+});
+
+// E-posta gönderme fonksiyonu
+async function sendEmail(to, subject, html) {
+  try {
+    const mailOptions = {
+      from: process.env.EMAIL_USER,
+      to,
+      subject,
+      html
+    };
+    await transporter.sendMail(mailOptions);
+    return true;
+  } catch (error) {
+    console.error('E-posta gönderme hatası:', error);
+    return false;
+  }
+}
 
 const notificationService = {
   async connect() {
@@ -28,78 +56,103 @@ const notificationService = {
 
   async sendBookingNotification(booking) {
     try {
-      const message = {
-        type: 'BOOKING_REQUEST',
-        data: {
-          guestId: booking.guest,
-          hostId: booking.host,
-          startDate: booking.startDate,
-          endDate: booking.endDate,
-          message: booking.message
-        }
-      };
+      // Randevu alan kişiyi bul
+      const recipient = await User.findById(booking.recipientId);
+      if (!recipient) return;
 
+      // Bildirim oluştur
+      const notification = new Notification({
+        userId: recipient._id,
+        type: 'booking_request',
+        message: `${booking.senderId.username} size randevu oluşturdu`,
+        bookingId: booking._id
+      });
+      await notification.save();
+
+      // Kafka'ya bildirim gönder
       await producer.send({
         topic: 'notifications',
         messages: [
-          { value: JSON.stringify(message) }
+          { value: JSON.stringify({ userId: recipient._id }) }
         ]
       });
 
-      const guest = await User.findById(booking.guest);
-      const host = await User.findById(booking.host);
-      const msg = `${guest.username} (${guest.email}) sizde ${booking.startDate.toLocaleDateString('tr-TR')} - ${booking.endDate.toLocaleDateString('tr-TR')} tarihleri arasında kalmak istiyor.`;
-      await createNotificationAndSendSMS({
-        userId: booking.host,
-        type: 'booking_request',
-        message: msg,
-        bookingId: booking._id
-      });
+      // E-posta gönder
+      const emailHtml = `
+        <h1>Yeni Randevu İsteği</h1>
+        <p>${booking.senderId.username} size yeni bir randevu oluşturdu.</p>
+        <p>Randevu Detayları:</p>
+        <ul>
+          <li>Tarih: ${new Date(booking.date).toLocaleDateString('tr-TR')}</li>
+          <li>Saat: ${booking.time}</li>
+          <li>Açıklama: ${booking.description}</li>
+        </ul>
+        <p>Randevuyu görüntülemek ve yanıtlamak için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
+      `;
+
+      await sendEmail(recipient.email, 'Yeni Randevu İsteği', emailHtml);
+
+      // WhatsApp bildirimi gönder (opsiyonel)
+      if (recipient.phone) {
+        await sendWhatsApp(
+          recipient.phone,
+          `Yeni randevu isteği: ${booking.senderId.username} size randevu oluşturdu. Detaylar için e-postanızı kontrol edin.`
+        );
+      }
     } catch (error) {
-      console.error('Error sending notification:', error);
+      console.error('Bildirim gönderme hatası:', error);
     }
   },
 
-  async sendBookingStatusUpdate(booking) {
+  async sendBookingApprovalNotification(booking) {
     try {
-      const message = {
-        type: 'BOOKING_STATUS_UPDATE',
-        data: {
-          bookingId: booking._id,
-          status: booking.status,
-          guestId: booking.guest,
-          hostId: booking.host
-        }
-      };
+      // Randevu oluşturan kişiyi bul
+      const sender = await User.findById(booking.senderId);
+      if (!sender) return;
 
+      // Bildirim oluştur
+      const notification = new Notification({
+        userId: sender._id,
+        type: 'booking_approved',
+        message: `${booking.recipientId.username} randevunuzu onayladı`,
+        bookingId: booking._id
+      });
+      await notification.save();
+
+      // Kafka'ya bildirim gönder
       await producer.send({
         topic: 'notifications',
         messages: [
-          { value: JSON.stringify(message) }
+          { value: JSON.stringify({ userId: sender._id }) }
         ]
       });
+
+      // E-posta gönder
+      const emailHtml = `
+        <h1>Randevu Onaylandı</h1>
+        <p>${booking.recipientId.username} randevunuzu onayladı.</p>
+        <p>Randevu Detayları:</p>
+        <ul>
+          <li>Tarih: ${new Date(booking.date).toLocaleDateString('tr-TR')}</li>
+          <li>Saat: ${booking.time}</li>
+          <li>Açıklama: ${booking.description}</li>
+        </ul>
+        <p>Randevuyu görüntülemek için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
+      `;
+
+      await sendEmail(sender.email, 'Randevu Onaylandı', emailHtml);
+
+      // WhatsApp bildirimi gönder (opsiyonel)
+      if (sender.phone) {
+        await sendWhatsApp(
+          sender.phone,
+          `Randevunuz onaylandı: ${booking.recipientId.username} randevunuzu onayladı. Detaylar için e-postanızı kontrol edin.`
+        );
+      }
     } catch (error) {
-      console.error('Error sending status update:', error);
+      console.error('Bildirim gönderme hatası:', error);
     }
   }
 };
-
-async function createNotificationAndSendSMS({ userId, type, message, bookingId }) {
-  await Notification.create({
-    user: userId,
-    type,
-    message,
-    booking: bookingId
-  });
-  const user = await User.findById(userId);
-  if (user && user.phone) {
-    try {
-      await sendWhatsApp(user.phone, message);
-      console.log(`[WhatsApp] ${user.phone}: ${message}`);
-    } catch (err) {
-      console.error('WhatsApp mesajı gönderilemedi:', err);
-    }
-  }
-}
 
 module.exports = notificationService; 
