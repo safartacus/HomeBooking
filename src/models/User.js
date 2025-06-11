@@ -21,7 +21,7 @@ const userSchema = new mongoose.Schema({
   },
   profilePicture: {
     type: String,
-    default: ''
+    default: 'https://isobarscience.com/wp-content/uploads/2020/09/default-profile-picture1.jpg'
   },
   phone: {
     type: String,
