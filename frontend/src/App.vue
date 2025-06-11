@@ -230,6 +230,12 @@ body {
   justify-content: center;
   align-items: flex-start;
 }
+.logo {
+  width: 48px;
+  height: 48px;
+  display: block;
+  margin: 0 auto 8px auto;
+}
 @media (max-width: 700px) {
   .nav-content {
     padding: 0 1rem;

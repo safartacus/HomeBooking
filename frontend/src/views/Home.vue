@@ -1,7 +1,8 @@
 <template>
   <div class="home">
     <header class="hero">
-      <h1>Ev Randevu Sistemi</h1>
+      
+      <h1>Ev Randevu</h1>
       <p>Arkadaşlarınız ve ailenizle randevu almanın en kolay yolu</p>
     </header>
 
@@ -101,4 +102,6 @@ const isAuthenticated = computed(() => {
   background: #2c3e50;
   color: white;
 }
+
+
 </style> 
