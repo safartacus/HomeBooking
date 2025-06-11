@@ -4,28 +4,30 @@ import { useRouter } from 'vue-router'
 import api from '@/api'
 import socket from './socket'
 import { useNotificationStore } from './stores/notification'
+import { useUserStore } from './stores/user'
 
 const notificationStore = useNotificationStore()
+const userStore = useUserStore()
 const router = useRouter()
-const isAuthenticated = computed(() => {
-  return !!localStorage.getItem('token')
-})
-const profilePicture = ref('')
 const showProfileMenu = ref(false)
-const userId = ref(null)
 
 const fetchProfileAndNotifications = async () => {
-  if (!isAuthenticated.value) return
+  if (!userStore.isAuthenticated) return
   try {
     const token = localStorage.getItem('token')
     const profileRes = await api.get('/profiles/me', {
       headers: { Authorization: `Bearer ${token}` }
     })
-    profilePicture.value = profileRes.data.profilePicture
-    userId.value = profileRes.data._id
-    socket.emit('register', userId.value)
+    userStore.setUser({
+      token,
+      profilePicture: profileRes.data.profilePicture,
+      username: profileRes.data.username
+    })
+    socket.emit('register', profileRes.data._id)
     await notificationStore.fetchNotifications()
-  } catch {}
+  } catch {
+    userStore.logout()
+  }
 }
 
 onMounted(() => {
@@ -36,7 +38,7 @@ onMounted(() => {
 })
 
 const handleLogout = () => {
-  localStorage.removeItem('token')
+  userStore.logout()
   router.push('/login')
 }
 
@@ -58,7 +60,7 @@ const handleProfileMenuBlur = (e) => {
       <div class="nav-brand">
         <router-link to="/">Ev Randevu</router-link>
       </div>
-      <div class="nav-links" v-if="isAuthenticated">
+      <div class="nav-links" v-if="userStore.isAuthenticated">
         <router-link to="/create-booking">Randevu Oluştur</router-link>
         <router-link to="/bookings">Randevular</router-link>
         <router-link to="/profile">Profil</router-link>
@@ -68,7 +70,7 @@ const handleProfileMenuBlur = (e) => {
             <span v-if="notificationStore.unreadCount > 0" class="notif-badge">{{ notificationStore.unreadCount }}</span>
           </div>
           <div class="profile-menu-wrapper" tabindex="0" @blur="handleProfileMenuBlur">
-            <img v-if="profilePicture" :src="profilePicture" class="profile-avatar" @click="handleProfileClick" />
+            <img v-if="userStore.profilePicture" :src="userStore.profilePicture" class="profile-avatar" @click="handleProfileClick" />
             <div v-if="showProfileMenu" class="profile-menu">
               <button class="menu-item" @click="handleLogout">Çıkış Yap</button>
             </div>

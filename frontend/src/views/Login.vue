@@ -71,6 +71,7 @@
 import { ref } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
+import { useUserStore } from '@/stores/user'
 
 const router = useRouter()
 const email = ref('')
@@ -79,6 +80,7 @@ const otp = ref('')
 const error = ref('')
 const loading = ref(false)
 const showOtpForm = ref(false)
+const userStore = useUserStore()
 
 const handleLogin = async () => {
   try {
@@ -109,6 +111,17 @@ const handleOtpVerification = async () => {
     })
 
     localStorage.setItem('token', response.data.token)
+
+    // PROFİLİ ÇEK VE STORE'A YAZ
+    const profileRes = await api.get('/profiles/me', {
+      headers: { Authorization: `Bearer ${response.data.token}` }
+    })
+    userStore.setUser({
+      token: response.data.token,
+      profilePicture: profileRes.data.profilePicture,
+      username: profileRes.data.username
+    })
+
     router.push('/profile')
   } catch (err) {
     error.value = err.response?.data?.message || 'Doğrulama sırasında bir hata oluştu'
