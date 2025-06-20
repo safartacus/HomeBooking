@@ -59,6 +59,18 @@
             <label><input type="radio" value="Elim dolu geleceğim" v-model="arrivalType"> Elim dolu geleceğim</label>
           </div>
         </div>
+        <div class="form-group">
+          <label for="guestCount">Kaç Kişi Gelecek?</label>
+          <input
+            id="guestCount"
+            type="number"
+            v-model="guestCount"
+            min="1"
+            max="20"
+            required
+            placeholder="Misafir sayısı"
+          >
+        </div>
         <div class="error" v-if="error">{{ error }}</div>
         <div class="success" v-if="success">{{ success }}</div>
         <button type="submit" class="btn primary" :disabled="loading || !canSubmit">
@@ -93,6 +105,7 @@ const highlightedDates = ref([])
 const disabledDates = ref([])
 const canSubmit = ref(false)
 const arrivalType = ref('Elim boş geleceğim')
+const guestCount = ref(1)
 
 // Kullanıcı arama
 const searchUsers = async () => {
@@ -129,6 +142,7 @@ const clearSelectedUser = () => {
   disabledDates.value = []
   availability.value = null
   canSubmit.value = false
+  guestCount.value = 1
 }
 
 // Kullanıcının dolu günlerini çek
@@ -210,7 +224,8 @@ const handleCreateBooking = async () => {
       startDate: dateRange.value[0],
       endDate: dateRange.value[1],
       message: message.value,
-      arrivalType: arrivalType.value
+      arrivalType: arrivalType.value,
+      guestCount: guestCount.value
     }, {
       headers: { Authorization: `Bearer ${token}` }
     })

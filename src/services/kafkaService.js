@@ -57,14 +57,18 @@ const notificationService = {
   async sendBookingNotification(booking) {
     try {
       // Randevu alan kişiyi bul
-      const recipient = await User.findById(booking.recipientId);
+      const recipient = await User.findById(booking.host);
       if (!recipient) return;
+
+      // Randevu oluşturan kişiyi bul
+      const guest = await User.findById(booking.guest);
+      if (!guest) return;
 
       // Bildirim oluştur
       const notification = new Notification({
         userId: recipient._id,
         type: 'booking_request',
-        message: `${booking.senderId.username} size randevu oluşturdu. Geliş durumu: ${booking.arrivalType}`,
+        message: `${guest.username} size randevu oluşturdu. ${booking.guestCount} kişi gelecek. Geliş durumu: ${booking.arrivalType}`,
         bookingId: booking._id
       });
       await notification.save();
@@ -80,12 +84,13 @@ const notificationService = {
       // E-posta gönder
       const emailHtml = `
         <h1>Yeni Randevu İsteği</h1>
-        <p>${booking.senderId.username} size yeni bir randevu oluşturdu.</p>
+        <p>${guest.username} size yeni bir randevu oluşturdu.</p>
         <p>Randevu Detayları:</p>
         <ul>
-          <li>Tarih: ${new Date(booking.date).toLocaleDateString('tr-TR')}</li>
-          <li>Saat: ${booking.time}</li>
-          <li>Açıklama: ${booking.description}</li>
+          <li>Başlangıç: ${new Date(booking.startDate).toLocaleDateString('tr-TR')}</li>
+          <li>Bitiş: ${new Date(booking.endDate).toLocaleDateString('tr-TR')}</li>
+          <li>Misafir Sayısı: ${booking.guestCount} kişi</li>
+          <li>Mesaj: ${booking.message}</li>
           <li>Geliş Durumu: ${booking.arrivalType}</li>
         </ul>
         <p>Randevuyu görüntülemek ve yanıtlamak için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
@@ -97,7 +102,7 @@ const notificationService = {
       if (recipient.phone) {
         await sendWhatsApp(
           recipient.phone,
-          `Yeni randevu isteği: ${booking.senderId.username} size randevu oluşturdu. Detaylar için e-postanızı kontrol edin.`
+          `Yeni randevu isteği: ${guest.username} size ${booking.guestCount} kişi ile randevu oluşturdu. Detaylar için e-postanızı kontrol edin.`
         );
       }
     } catch (error) {
@@ -108,14 +113,18 @@ const notificationService = {
   async sendBookingApprovalNotification(booking) {
     try {
       // Randevu oluşturan kişiyi bul
-      const sender = await User.findById(booking.senderId);
-      if (!sender) return;
+      const guest = await User.findById(booking.guest);
+      if (!guest) return;
+
+      // Ev sahibini bul
+      const host = await User.findById(booking.host);
+      if (!host) return;
 
       // Bildirim oluştur
       const notification = new Notification({
-        userId: sender._id,
+        userId: guest._id,
         type: 'booking_approved',
-        message: `${booking.recipientId.username} randevunuzu onayladı`,
+        message: `${host.username} randevunuzu onayladı`,
         bookingId: booking._id
       });
       await notification.save();
@@ -124,30 +133,31 @@ const notificationService = {
       await producer.send({
         topic: 'notifications',
         messages: [
-          { value: JSON.stringify({ userId: sender._id }) }
+          { value: JSON.stringify({ userId: guest._id }) }
         ]
       });
 
       // E-posta gönder
       const emailHtml = `
         <h1>Randevu Onaylandı</h1>
-        <p>${booking.recipientId.username} randevunuzu onayladı.</p>
+        <p>${host.username} randevunuzu onayladı.</p>
         <p>Randevu Detayları:</p>
         <ul>
-          <li>Tarih: ${new Date(booking.date).toLocaleDateString('tr-TR')}</li>
-          <li>Saat: ${booking.time}</li>
-          <li>Açıklama: ${booking.description}</li>
+          <li>Başlangıç: ${new Date(booking.startDate).toLocaleDateString('tr-TR')}</li>
+          <li>Bitiş: ${new Date(booking.endDate).toLocaleDateString('tr-TR')}</li>
+          <li>Misafir Sayısı: ${booking.guestCount} kişi</li>
+          <li>Mesaj: ${booking.message}</li>
         </ul>
         <p>Randevuyu görüntülemek için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
       `;
 
-      await sendEmail(sender.email, 'Randevu Onaylandı', emailHtml);
+      await sendEmail(guest.email, 'Randevu Onaylandı', emailHtml);
 
       // WhatsApp bildirimi gönder (opsiyonel)
-      if (sender.phone) {
+      if (guest.phone) {
         await sendWhatsApp(
-          sender.phone,
-          `Randevunuz onaylandı: ${booking.recipientId.username} randevunuzu onayladı. Detaylar için e-postanızı kontrol edin.`
+          guest.phone,
+          `Randevunuz onaylandı: ${host.username} randevunuzu onayladı. Detaylar için e-postanızı kontrol edin.`
         );
       }
     } catch (error) {

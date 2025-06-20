@@ -34,6 +34,13 @@ const bookingSchema = new mongoose.Schema({
     default: 'Elim boş geleceğim',
     required: true
   },
+  guestCount: {
+    type: Number,
+    required: true,
+    min: 1,
+    max: 20,
+    default: 1
+  },
   createdAt: {
     type: Date,
     default: Date.now

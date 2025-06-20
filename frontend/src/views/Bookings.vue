@@ -54,6 +54,7 @@
               </div>
               <p class="booking-message">{{ booking.message }}</p>
               <p class="booking-arrival"><strong>Geliş Durumu:</strong> {{ booking.arrivalType }}</p>
+              <p class="booking-guest-count"><strong>Misafir Sayısı:</strong> {{ booking.guestCount }} kişi</p>
               <div v-if="booking.status === 'pending'" class="booking-actions">
                 <button class="btn approve" @click="updateBookingStatus(booking._id, 'approved')">Onayla</button>
                 <button class="btn reject" @click="updateBookingStatus(booking._id, 'rejected')">Reddet</button>
@@ -76,6 +77,7 @@
               </div>
               <p class="booking-message">{{ booking.message }}</p>
               <p class="booking-arrival"><strong>Geliş Durumu:</strong> {{ booking.arrivalType }}</p>
+              <p class="booking-guest-count"><strong>Misafir Sayısı:</strong> {{ booking.guestCount }} kişi</p>
             </div>
           </div>
         </template>
@@ -279,6 +281,11 @@ h1 {
   font-size: 1rem;
 }
 .booking-arrival {
+  color: #666;
+  margin-bottom: 0.7rem;
+  font-size: 1rem;
+}
+.booking-guest-count {
   color: #666;
   margin-bottom: 0.7rem;
   font-size: 1rem;
