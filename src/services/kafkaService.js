@@ -125,6 +125,7 @@ const notificationService = {
 
   async sendBookingApprovalNotification(booking) {
     try {
+      console.log('sendBookingApprovalNotification çağrıldı, booking:', booking);
       // Randevu oluşturan kişiyi bul
       const guest = await User.findById(booking.guest);
       if (!guest) {
@@ -146,7 +147,7 @@ const notificationService = {
         message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
         booking: booking._id
       });
-      
+      console.log('booking_approved notification kaydedilecek:', notification);
       await notification.save();
 
       // Kafka'ya bildirim gönder

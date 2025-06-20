@@ -114,7 +114,7 @@ router.patch('/:id', auth, async (req, res) => {
     // Update status
     booking.status = status;
     await booking.save();
-
+    console.log("booking updated",booking);
     // Send notification
     if (status === 'approved') {
       await notificationService.sendBookingApprovalNotification(booking);
