@@ -47,8 +47,6 @@ async function sendEmail(to, subject, html) {
 const notificationService = {
   async connect() {
     try {
-      console.log('=== Kafka bağlantısı başlatılıyor ===');
-      console.log('Kafka brokers:', process.env.KAFKA_BROKER || 'localhost:9092');
       await producer.connect();
       console.log('Connected to Kafka');
     } catch (error) {
@@ -58,42 +56,31 @@ const notificationService = {
   },
 
   async sendBookingNotification(booking) {
-    console.log('=== sendBookingNotification başladı ===');
-    console.log('Booking objesi:', JSON.stringify(booking, null, 2));
-    
     try {
       // Randevu alan kişiyi bul
-      console.log('Host ID aranıyor:', booking.host);
       const recipient = await User.findById(booking.host);
-      console.log('Host bulundu:', recipient ? 'Evet' : 'Hayır');
       if (!recipient) {
-        console.log('Host bulunamadı, fonksiyon sonlandırılıyor');
+        console.error('sendBookingNotification: Recipient (host) not found for booking:', booking._id);
         return;
       }
 
       // Randevu oluşturan kişiyi bul
-      console.log('Guest ID aranıyor:', booking.guest);
       const guest = await User.findById(booking.guest);
-      console.log('Guest bulundu:', guest ? 'Evet' : 'Hayır');
       if (!guest) {
-        console.log('Guest bulunamadı, fonksiyon sonlandırılıyor');
+        console.error('sendBookingNotification: Guest not found for booking:', booking._id);
         return;
       }
 
-      console.log('Bildirim oluşturuluyor...');
       // Bildirim oluştur
       const notification = new Notification({
         user: recipient._id,
         type: 'booking_request',
-        message: `${guest.username} size randevu oluşturdu. ${booking.guestCount} kişi gelecek. Geliş durumu: ${booking.arrivalType}`,
+        message: `${guest.username} size ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} için randevu oluşturdu. ${booking.guestCount} kişi gelecek. Geliş durumu: ${booking.arrivalType}`,
         booking: booking._id
       });
-      console.log('Notification objesi:', JSON.stringify(notification, null, 2));
       
       await notification.save();
-      console.log('Bildirim veritabanına kaydedildi');
 
-      console.log('Kafka mesajı gönderiliyor...');
       // Kafka'ya bildirim gönder
       await producer.send({
         topic: 'notifications',
@@ -101,9 +88,7 @@ const notificationService = {
           { value: JSON.stringify({ userId: recipient._id }) }
         ]
       });
-      console.log('Kafka mesajı gönderildi');
 
-      console.log('E-posta gönderiliyor...');
       // E-posta gönder
       const emailHtml = `
         <h1>Yeni Randevu İsteği</h1>
@@ -120,24 +105,17 @@ const notificationService = {
       `;
 
       await sendEmail(recipient.email, 'Yeni Randevu İsteği', emailHtml);
-      console.log('E-posta gönderildi');
 
       // WhatsApp bildirimi gönder (opsiyonel) - Şimdilik devre dışı
       /*
       if (recipient.phone) {
-        console.log('WhatsApp mesajı gönderiliyor...');
         await sendWhatsApp(
           recipient.phone,
           `Yeni randevu isteği: ${guest.username} size ${booking.guestCount} kişi ile randevu oluşturdu. Detaylar için e-postanızı kontrol edin.`
         );
-        console.log('WhatsApp mesajı gönderildi');
-      } else {
-        console.log('Telefon numarası yok, WhatsApp mesajı gönderilmedi');
       }
       */
-      console.log('WhatsApp mesajı şimdilik devre dışı');
       
-      console.log('=== sendBookingNotification başarıyla tamamlandı ===');
     } catch (error) {
       console.error('=== sendBookingNotification HATASI ===');
       console.error('Hata detayı:', error);
@@ -146,42 +124,31 @@ const notificationService = {
   },
 
   async sendBookingApprovalNotification(booking) {
-    console.log('=== sendBookingApprovalNotification başladı ===');
-    console.log('Booking objesi:', JSON.stringify(booking, null, 2));
-    
     try {
       // Randevu oluşturan kişiyi bul
-      console.log('Guest ID aranıyor:', booking.guest);
       const guest = await User.findById(booking.guest);
-      console.log('Guest bulundu:', guest ? 'Evet' : 'Hayır');
       if (!guest) {
-        console.log('Guest bulunamadı, fonksiyon sonlandırılıyor');
+        console.error('sendBookingApprovalNotification: Guest not found for booking:', booking._id);
         return;
       }
 
       // Ev sahibini bul
-      console.log('Host ID aranıyor:', booking.host);
       const host = await User.findById(booking.host);
-      console.log('Host bulundu:', host ? 'Evet' : 'Hayır');
       if (!host) {
-        console.log('Host bulunamadı, fonksiyon sonlandırılıyor');
+        console.error('sendBookingApprovalNotification: Host not found for booking:', booking._id);
         return;
       }
 
-      console.log('Onay bildirimi oluşturuluyor...');
       // Bildirim oluştur
       const notification = new Notification({
         user: guest._id,
         type: 'booking_approved',
-        message: `${host.username} randevunuzu onayladı`,
+        message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
         booking: booking._id
       });
-      console.log('Notification objesi:', JSON.stringify(notification, null, 2));
       
       await notification.save();
-      console.log('Onay bildirimi veritabanına kaydedildi');
 
-      console.log('Kafka onay mesajı gönderiliyor...');
       // Kafka'ya bildirim gönder
       await producer.send({
         topic: 'notifications',
@@ -189,9 +156,7 @@ const notificationService = {
           { value: JSON.stringify({ userId: guest._id }) }
         ]
       });
-      console.log('Kafka onay mesajı gönderildi');
 
-      console.log('Onay e-postası gönderiliyor...');
       // E-posta gönder
       const emailHtml = `
         <h1>Randevu Onaylandı</h1>
@@ -207,24 +172,17 @@ const notificationService = {
       `;
 
       await sendEmail(guest.email, 'Randevu Onaylandı', emailHtml);
-      console.log('Onay e-postası gönderildi');
 
       // WhatsApp bildirimi gönder (opsiyonel) - Şimdilik devre dışı
       /*
       if (guest.phone) {
-        console.log('WhatsApp onay mesajı gönderiliyor...');
         await sendWhatsApp(
           guest.phone,
           `Randevunuz onaylandı: ${host.username} randevunuzu onayladı. Detaylar için e-postanızı kontrol edin.`
         );
-        console.log('WhatsApp onay mesajı gönderildi');
-      } else {
-        console.log('Telefon numarası yok, WhatsApp onay mesajı gönderilmedi');
       }
       */
-      console.log('WhatsApp onay mesajı şimdilik devre dışı');
       
-      console.log('=== sendBookingApprovalNotification başarıyla tamamlandı ===');
     } catch (error) {
       console.error('=== sendBookingApprovalNotification HATASI ===');
       console.error('Hata detayı:', error);

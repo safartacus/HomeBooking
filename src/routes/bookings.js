@@ -84,11 +84,8 @@ router.post('/', auth, async (req, res) => {
     });
 
     await booking.save();
-    console.log("booking created",booking);
-    console.log("=== Booking oluşturuldu, bildirim gönderiliyor ===");
     // Send notification
     await notificationService.sendBookingNotification(booking);
-    console.log("=== Bildirim gönderme tamamlandı ===");
 
     res.status(201).json({
       message: 'Randevu başarıyla oluşturuldu',
@@ -117,29 +114,20 @@ router.patch('/:id', auth, async (req, res) => {
     // Update status
     booking.status = status;
     await booking.save();
-    console.log("=== Booking durumu güncellendi:", status, "===");
 
     // Send notification
     if (status === 'approved') {
-      console.log("=== Booking onaylandı, onay bildirimi gönderiliyor ===");
-      console.log("Booking ID:", booking._id);
-      console.log("Host ID (onaylayan):", req.user._id);
-      
       await notificationService.sendBookingApprovalNotification(booking);
-      console.log("=== Onay bildirimi gönderme tamamlandı ===");
       
       // İlgili bildirimi okundu olarak işaretle
-      console.log("Bildirim aranıyor...");
-      const updatedNotification = await Notification.findOneAndUpdate(
+      await Notification.findOneAndUpdate(
         { 
           booking: booking._id, 
           user: req.user._id,
           type: 'booking_request'
         }, 
-        { isRead: true },
-        { new: true }
+        { isRead: true }
       );
-      console.log('Bildirim güncelleme sonucu:', updatedNotification);
     }
 
     res.json({
