@@ -45,6 +45,23 @@ router.patch('/:id/read', auth, async (req, res) => {
   }
 });
 
+// Booking ID'ye göre bildirimi okundu işaretle
+router.patch('/booking/:bookingId/read', auth, async (req, res) => {
+  try {
+    await Notification.findOneAndUpdate(
+      { 
+        booking: req.params.bookingId, 
+        user: req.user._id,
+        type: 'booking_request'
+      }, 
+      { isRead: true }
+    );
+    res.json({ message: 'Bildirim okundu olarak işaretlendi' });
+  } catch (error) {
+    res.status(500).json({ message: 'İşlem başarısız' });
+  }
+});
+
 // Randevuyu onayla/reddet (bildirim üzerinden)
 router.post('/:id/booking-action', auth, async (req, res) => {
   try {

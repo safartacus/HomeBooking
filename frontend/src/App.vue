@@ -32,8 +32,27 @@ const fetchProfileAndNotifications = async () => {
 
 onMounted(() => {
   fetchProfileAndNotifications()
-  socket.on('notification', () => {
+  socket.on('notification', (data) => {
+    console.log('🔔 Yeni bildirim alındı:', data)
     notificationStore.incrementUnread()
+    // Bildirimleri yeniden çek
+    notificationStore.fetchNotifications()
+  })
+  
+  socket.on('notification_update', (data) => {
+    console.log('🔄 Bildirim güncellemesi alındı:', data)
+    console.log('Güncelleme öncesi bildirim sayısı:', notificationStore.unreadCount)
+    // Bildirimleri yeniden çek (sayı güncellenecek)
+    notificationStore.fetchNotifications()
+  })
+  
+  // Socket bağlantı durumunu izle
+  socket.on('connect', () => {
+    console.log('✅ Socket.IO bağlandı, ID:', socket.id)
+  })
+  
+  socket.on('disconnect', () => {
+    console.log('❌ Socket.IO bağlantısı kesildi')
   })
 })
 

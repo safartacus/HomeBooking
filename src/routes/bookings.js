@@ -4,6 +4,8 @@ const jwt = require('jsonwebtoken');
 const User = require('../models/User');
 const Booking = require('../models/Booking');
 const notificationService = require('../services/kafkaService');
+const { io, userSockets } = require('../app');
+const Notification = require('../models/Notification');
 
 // Middleware to verify JWT token
 const auth = async (req, res, next) => {
@@ -121,8 +123,38 @@ router.patch('/:id', auth, async (req, res) => {
     // Send notification
     if (status === 'approved') {
       console.log("=== Booking onaylandı, onay bildirimi gönderiliyor ===");
+      console.log("Booking ID:", booking._id);
+      console.log("Host ID (onaylayan):", req.user._id);
+      
       await notificationService.sendBookingApprovalNotification(booking);
       console.log("=== Onay bildirimi gönderme tamamlandı ===");
+      
+      // İlgili bildirimi okundu olarak işaretle
+      console.log("Bildirim aranıyor...");
+      const updatedNotification = await Notification.findOneAndUpdate(
+        { 
+          booking: booking._id, 
+          user: req.user._id,
+          type: 'booking_request'
+        }, 
+        { isRead: true },
+        { new: true }
+      );
+      console.log('Bildirim güncelleme sonucu:', updatedNotification);
+      
+      // Onaylayan kişinin bildirim sayısını güncelle (Socket.IO ile)
+      console.log("Socket ID aranıyor:", req.user._id.toString());
+      const socketId = userSockets.get(req.user._id.toString());
+      console.log("Socket ID bulundu:", socketId);
+      if (socketId) {
+        io.to(socketId).emit('notification_update', {
+          type: 'booking_approved_by_me',
+          message: 'Randevu onaylandı'
+        });
+        console.log('Onaylayan kişiye bildirim güncellemesi gönderildi');
+      } else {
+        console.log('Socket ID bulunamadı, bildirim güncellemesi gönderilemedi');
+      }
     }
 
     res.json({
