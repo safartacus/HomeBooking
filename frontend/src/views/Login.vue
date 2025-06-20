@@ -25,6 +25,10 @@
           >
         </div>
 
+        <div class="forgot-password-link">
+          <router-link to="/forgot-password">Şifremi Unuttum</router-link>
+        </div>
+
         <div class="error" v-if="error">
           {{ error }}
         </div>
@@ -229,6 +233,22 @@ input {
 }
 
 .register-link a:hover {
+  text-decoration: underline;
+}
+
+.forgot-password-link {
+  text-align: right;
+  margin-top: -1rem;
+  margin-bottom: 1.2rem;
+}
+
+.forgot-password-link a {
+  color: #42b983;
+  font-size: 0.95rem;
+  text-decoration: none;
+}
+
+.forgot-password-link a:hover {
   text-decoration: underline;
 }
 

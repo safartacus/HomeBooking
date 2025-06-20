@@ -106,4 +106,43 @@ router.post('/verify-otp', async (req, res) => {
   }
 });
 
+// Şifremi unuttum - kod gönder
+router.post('/forgot-password', async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'Bu e-posta ile kayıtlı kullanıcı bulunamadı' });
+    }
+    const otpSent = await generateAndSendOTP(email);
+    if (!otpSent) {
+      return res.status(500).json({ message: 'Kod gönderilemedi' });
+    }
+    res.json({ message: 'Doğrulama kodu e-posta adresinize gönderildi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
+// Şifre sıfırlama
+router.post('/reset-password', async (req, res) => {
+  try {
+    const { email, otp, newPassword } = req.body;
+    // OTP doğrula
+    const isValid = verifyOTP(email, otp);
+    if (!isValid) {
+      return res.status(401).json({ message: 'Geçersiz veya süresi dolmuş kod' });
+    }
+    const user = await User.findOne({ email });
+    if (!user) {
+      return res.status(404).json({ message: 'Kullanıcı bulunamadı' });
+    }
+    user.password = newPassword;
+    await user.save();
+    res.json({ message: 'Şifreniz başarıyla güncellendi' });
+  } catch (error) {
+    res.status(500).json({ message: 'Sunucu hatası' });
+  }
+});
+
 module.exports = router; 
