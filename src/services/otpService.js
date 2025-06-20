@@ -23,7 +23,7 @@ async function generateAndSendOTP(email) {
     code: otp,
     expiresAt: Date.now() + 5 * 60 * 1000 // 5 dakika
   });
-  console.log("otpStore",otp);
+  console.log("otpStore",email + " " + otp);
   // E-posta içeriği
   const mailOptions = {
     from: process.env.EMAIL_USER,
