@@ -25,18 +25,9 @@
       </div>
       <div v-if="selectedUser" class="form-group">
         <label>Tarih Seç</label>
-        <Datepicker
-          v-model="dateRange"
-          :range="true"
-          :min-date="new Date()"
-          :disabled-dates="disabledDates"
-          :locale="'tr'"
-          :dayClass="getDayClass"
-          @update:model-value="onDateChange"
-        />
-        <div class="legend">
-          <span class="legend-item"><span class="legend-box busy"></span> Dolu</span>
-          <span class="legend-item"><span class="legend-box free"></span> Müsait</span>
+        <FullCalendar :options="calendarOptions" class="booking-calendar"/>
+        <div v-if="dateRange && dateRange.length === 2 && dateRange[0]" class="selected-dates-info">
+          <span><strong>Seçilen Aralık:</strong> {{ new Date(dateRange[0]).toLocaleDateString('tr-TR') }} - {{ new Date(dateRange[1]).toLocaleDateString('tr-TR') }}</span>
         </div>
         <div v-if="checkingAvailability" class="info">Müsaitlik kontrol ediliyor...</div>
         <div v-else-if="availability === true" class="success">Ev sahibi bu tarihlerde müsait.</div>
@@ -82,10 +73,12 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, reactive } from 'vue'
 import api from '@/api'
-import Datepicker from '@vuepic/vue-datepicker'
-import '@vuepic/vue-datepicker/dist/main.css'
+import FullCalendar from '@fullcalendar/vue3'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import interactionPlugin from '@fullcalendar/interaction'
+import trLocale from '@fullcalendar/core/locales/tr';
 
 const searchQuery = ref('')
 const searchResults = ref([])
@@ -97,128 +90,130 @@ const success = ref('')
 const loading = ref(false)
 const checkingAvailability = ref(false)
 const availability = ref(null)
-const today = new Date()
-const tomorrow = new Date()
-tomorrow.setDate(today.getDate() + 1)
-const dateRange = ref([today, tomorrow])
-const highlightedDates = ref([])
-const disabledDates = ref([])
+const dateRange = ref([])
 const canSubmit = ref(false)
 const arrivalType = ref('Elim boş geleceğim')
 const guestCount = ref(1)
 
-// Kullanıcı arama
-const searchUsers = async () => {
-  if (!searchQuery.value) {
-    searchResults.value = []
-    showResults.value = false
-    return
+const calendarOptions = reactive({
+  plugins: [dayGridPlugin, interactionPlugin],
+  initialView: 'dayGridMonth',
+  locale: trLocale,
+  selectable: true,
+  selectOverlap: false,
+  select: handleDateSelect,
+  events: [],
+  selectAllow: function(selectInfo) {
+    return new Date(selectInfo.start) >= new Date().setHours(0, 0, 0, 0);
+  },
+  dayCellDidMount: function(arg) {
+    if (arg.isPast) {
+      arg.el.style.backgroundColor = '#eeeeee';
+      return;
+    }
+    const isBooked = calendarOptions.events.some(event => {
+      const startDate = new Date(event.start).setHours(0,0,0,0);
+      const endDate = new Date(event.end).setHours(0,0,0,0);
+      return arg.date.setHours(0,0,0,0) >= startDate && arg.date.setHours(0,0,0,0) < endDate;
+    });
+
+    if (isBooked) {
+      arg.el.style.backgroundColor = '#ffcdd2';
+    } else {
+      arg.el.style.backgroundColor = '#dcedc8';
+    }
   }
+});
+
+watch(selectedUser, (newUser) => {
+  if (newUser) {
+    fetchUserBookings();
+  } else {
+    calendarOptions.events = [];
+    dateRange.value = [];
+    availability.value = null;
+    canSubmit.value = false;
+  }
+});
+
+async function fetchUserBookings() {
+  if (!selectedUser.value) return;
   try {
-    const token = localStorage.getItem('token')
-    const res = await api.get('/profiles/search', {
-      params: { query: searchQuery.value },
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    searchResults.value = res.data.users
-    showResults.value = true
-  } catch {
-    searchResults.value = []
-    showResults.value = false
+    const token = localStorage.getItem('token');
+    const res = await api.get('/bookings', { headers: { Authorization: `Bearer ${token}` } });
+    
+    if (!res.data || !Array.isArray(res.data.asHost)) {
+        console.error("Failed to fetch user bookings: Invalid API response structure", res.data);
+        calendarOptions.events = [];
+        return;
+    }
+
+    const bookings = res.data.asHost.filter(b => ['pending', 'approved'].includes(b.status));
+    
+    calendarOptions.events = bookings.map(b => ({
+      title: '',
+      start: b.startDate,
+      end: new Date(new Date(b.endDate).getTime() + 24 * 60 * 60 * 1000).toISOString().split('T')[0],
+      display: 'background',
+      color: '#ffcdd2'
+    }));
+  } catch (err) {
+    console.error("Failed to fetch user bookings", err);
+    calendarOptions.events = [];
   }
 }
 
-const selectUser = (user) => {
-  selectedUser.value = user
-  showResults.value = false
-  searchQuery.value = ''
-  fetchUserBookings()
-}
+function handleDateSelect(selectionInfo) {
+  const { start, end } = selectionInfo;
+  const inclusiveEndDate = new Date(end.getTime() - (24 * 60 * 60 * 1000));
+  const newRange = [start, inclusiveEndDate];
 
-const clearSelectedUser = () => {
-  selectedUser.value = null
-  dateRange.value = [today, tomorrow]
-  highlightedDates.value = []
-  disabledDates.value = []
-  availability.value = null
-  canSubmit.value = false
-  guestCount.value = 1
-}
-
-// Kullanıcının dolu günlerini çek
-const fetchUserBookings = async () => {
-  if (!selectedUser.value) return
-  try {
-    const token = localStorage.getItem('token')
-    const res = await api.get('/bookings', {
-      headers: { Authorization: `Bearer ${token}` }
-    })
-    // Sadece seçili kullanıcının host olduğu ve pending/approved olan randevular
-    const bookings = res.data.bookings.filter(b => b.host._id === selectedUser.value._id && ['pending','approved'].includes(b.status))
-    let busy = []
-    bookings.forEach(b => {
-      const start = new Date(b.startDate)
-      const end = new Date(b.endDate)
-      for (let d = new Date(start); d <= end; d.setDate(d.getDate() + 1)) {
-        busy.push(new Date(d))
-      }
-    })
-    busyDays.value = busy
-    disabledDates.value = []
-  } catch {
-    busyDays.value = []
-    disabledDates.value = []
-  }
+  onDateChange(newRange);
 }
 
 const onDateChange = async (range) => {
-  // Kullanıcı dolu gün seçerse uyarı ver
-  if (range[0] && highlightedDates.value.some(h => sameDay(new Date(range[0]), h.date))) {
-    error.value = 'Başlangıç tarihi dolu! Lütfen başka bir gün seçin.'
-    dateRange.value = [null, null]
-    return
-  }
-  if (range[1] && highlightedDates.value.some(h => sameDay(new Date(range[1]), h.date))) {
-    error.value = 'Bitiş tarihi dolu! Lütfen başka bir gün seçin.'
-    dateRange.value = [range[0], null]
-    return
-  }
-  error.value = ''
-  dateRange.value = range
-  canSubmit.value = false
-  availability.value = null
-  if (!selectedUser.value || !range[0] || !range[1]) return
+  error.value = '';
+  dateRange.value = range;
+  canSubmit.value = false;
+  availability.value = null;
+
+  if (!selectedUser.value || !range[0] || !range[1]) return;
+
   try {
-    checkingAvailability.value = true
-    const token = localStorage.getItem('token')
+    checkingAvailability.value = true;
+    const token = localStorage.getItem('token');
     const availRes = await api.get(`/bookings/availability`, {
       params: {
         hostId: selectedUser.value._id,
-        startDate: range[0],
-        endDate: range[1]
+        startDate: range[0].toISOString(),
+        endDate: range[1].toISOString()
       },
       headers: { Authorization: `Bearer ${token}` }
-    })
-    availability.value = availRes.data.available
-    canSubmit.value = availRes.data.available
-  } catch {
-    availability.value = null
-    canSubmit.value = false
+    });
+    availability.value = availRes.data.available;
+    canSubmit.value = availRes.data.available;
+    if (!availRes.data.available) {
+      error.value = 'Seçilen tarihler ev sahibinin başka bir randevusu ile çakışıyor!';
+    }
+  } catch(e) {
+    availability.value = null;
+    canSubmit.value = false;
+    error.value = e.response?.data?.message || 'Müsaitlik kontrol edilemedi.';
   } finally {
-    checkingAvailability.value = false
+    checkingAvailability.value = false;
   }
 }
 
-function sameDay(a, b) {
-  return a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate();
-}
-
 const handleCreateBooking = async () => {
-  error.value = ''
-  success.value = ''
-  loading.value = true
+  if (!canSubmit.value) {
+    error.value = 'Lütfen müsait bir tarih aralığı seçin.';
+    return;
+  }
+  error.value = '';
+  success.value = '';
+  loading.value = true;
   try {
-    const token = localStorage.getItem('token')
+    const token = localStorage.getItem('token');
     await api.post('/bookings', {
       hostId: selectedUser.value._id,
       startDate: dateRange.value[0],
@@ -228,36 +223,71 @@ const handleCreateBooking = async () => {
       guestCount: guestCount.value
     }, {
       headers: { Authorization: `Bearer ${token}` }
-    })
-    success.value = 'Randevu talebiniz gönderildi!'
-    dateRange.value = [today, tomorrow]
-    message.value = ''
-    arrivalType.value = 'Elim boş geleceğim'
-    canSubmit.value = false
-    fetchUserBookings()
+    });
+    success.value = 'Randevu talebiniz gönderildi!';
+    dateRange.value = [];
+    message.value = '';
+    canSubmit.value = false;
+    availability.value = null;
+    fetchUserBookings();
   } catch (err) {
-    error.value = err.response?.data?.message || 'Bir hata oluştu.'
+    error.value = err.response?.data?.message || 'Bir hata oluştu.';
   } finally {
-    loading.value = false
+    loading.value = false;
   }
 }
 
-// busy-day ve free-day için günlere class ekle
-function getDayClass({ date }) {
-  // busy-day: dolu günler
-  const isBusy = busyDays.value.some(d => sameDay(new Date(date), d))
-  if (isBusy) return 'busy-day'
-  // free-day: bugünden sonraki ve dolu olmayan günler
-  if (selectedUser.value && new Date(date) > today) return 'free-day'
-  return ''
+const searchUsers = async () => {
+  if (!searchQuery.value) {
+    searchResults.value = [];
+    showResults.value = false;
+    return;
+  }
+  try {
+    const token = localStorage.getItem('token');
+    const res = await api.get('/profiles/search', {
+      params: { query: searchQuery.value },
+      headers: { Authorization: `Bearer ${token}` }
+    });
+    searchResults.value = res.data.users;
+    showResults.value = true;
+  } catch {
+    searchResults.value = [];
+    showResults.value = false;
+  }
 }
 
-// busyDays arrayini doldur
-const busyDays = ref([])
+const selectUser = (user) => {
+  selectedUser.value = user;
+  showResults.value = false;
+  searchQuery.value = '';
+}
+
+const clearSelectedUser = () => {
+  selectedUser.value = null;
+}
 </script>
 
 <style scoped>
-@import '@vuepic/vue-datepicker/dist/main.css';
+.booking-calendar {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+}
+.selected-dates-info {
+  background-color: #e0f2fe;
+  padding: 0.8rem 1.2rem;
+  border-radius: 6px;
+  margin-bottom: 1rem;
+  text-align: center;
+  font-weight: 500;
+}
+.fc .fc-toolbar.fc-header-toolbar {
+  margin-bottom: 1.2rem;
+  font-size: 0.9em;
+}
+.fc-daygrid-day.fc-day-today {
+  background-color: #e0f2fe !important;
+}
 .create-booking {
   min-height: 100vh;
   display: flex;
