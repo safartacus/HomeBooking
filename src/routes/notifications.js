@@ -3,13 +3,20 @@ const router = express.Router();
 const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
 const Booking = require('../models/Booking');
+const User = require('../models/User');
 
 // Middleware to verify JWT token
 const auth = async (req, res, next) => {
   try {
     const token = req.header('Authorization').replace('Bearer ', '');
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    req.userId = decoded.userId;
+    const user = await User.findById(decoded.userId);
+
+    if (!user) {
+      throw new Error();
+    }
+
+    req.user = user;
     next();
   } catch (error) {
     res.status(401).json({ message: 'Lütfen giriş yapın' });
@@ -19,7 +26,7 @@ const auth = async (req, res, next) => {
 // Bildirimleri listele
 router.get('/', auth, async (req, res) => {
   try {
-    const notifications = await Notification.find({ user: req.userId })
+    const notifications = await Notification.find({ user: req.user._id })
       .sort({ createdAt: -1 })
       .populate('booking');
     res.json({ notifications });
@@ -46,7 +53,7 @@ router.post('/:id/booking-action', auth, async (req, res) => {
     if (!notification) return res.status(404).json({ message: 'Bildirim bulunamadı' });
     const booking = await Booking.findById(notification.booking);
     if (!booking) return res.status(404).json({ message: 'Randevu bulunamadı' });
-    if (booking.host.toString() !== req.userId) return res.status(403).json({ message: 'Yetkisiz' });
+    if (booking.host.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Yetkisiz' });
     booking.status = action;
     await booking.save();
     notification.isRead = true;
