@@ -7,7 +7,7 @@ const { generateAndSendOTP, verifyOTP } = require('../services/otpService');
 // Register route
 router.post('/register', async (req, res) => {
   try {
-    const { username, email, password } = req.body;
+    const { username, email, password, phone } = req.body;
 
     // Check if user already exists
     const existingUser = await User.findOne({ $or: [{ email }, { username }] });
@@ -19,7 +19,8 @@ router.post('/register', async (req, res) => {
     const user = new User({
       username,
       email,
-      password
+      password,
+      phone
     });
 
     await user.save();
