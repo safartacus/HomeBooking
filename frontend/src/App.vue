@@ -1,5 +1,5 @@
 <script setup>
-import { computed, ref, onMounted } from 'vue'
+import { computed, ref, onMounted, onUnmounted } from 'vue'
 import { useRouter } from 'vue-router'
 import api from '@/api'
 import socket from './socket'
@@ -32,6 +32,14 @@ const fetchProfileAndNotifications = async () => {
 
 onMounted(() => {
   fetchProfileAndNotifications()
+  
+  // Her 5 saniyede bir bildirimleri güncelle
+  const notificationInterval = setInterval(() => {
+    if (userStore.isAuthenticated) {
+      notificationStore.fetchNotifications()
+    }
+  }, 5000)
+  
   socket.on('notification', (data) => {
     console.log('🔔 Yeni bildirim alındı:', data)
     notificationStore.incrementUnread()
@@ -53,6 +61,11 @@ onMounted(() => {
   
   socket.on('disconnect', () => {
     console.log('❌ Socket.IO bağlantısı kesildi')
+  })
+  
+  // Component unmount olduğunda interval'i temizle
+  onUnmounted(() => {
+    clearInterval(notificationInterval)
   })
 })
 

@@ -4,7 +4,6 @@ const User = require('../models/User');
 const { sendWhatsApp } = require('./smsService');
 const nodemailer = require('nodemailer');
 const fs = require('fs');
-const { io, userSockets } = require('../app');
 
 const kafka = new Kafka({
   clientId: 'home-booking-app',
@@ -94,18 +93,6 @@ const notificationService = {
       await notification.save();
       console.log('Bildirim veritabanına kaydedildi');
 
-      // Socket.IO ile real-time bildirim gönder
-      const socketId = userSockets.get(recipient._id.toString());
-      if (socketId) {
-        io.to(socketId).emit('notification', {
-          type: 'new_notification',
-          message: notification.message
-        });
-        console.log('Socket.IO bildirimi gönderildi');
-      } else {
-        console.log('Kullanıcı socket bağlantısı bulunamadı');
-      }
-
       console.log('Kafka mesajı gönderiliyor...');
       // Kafka'ya bildirim gönder
       await producer.send({
@@ -193,18 +180,6 @@ const notificationService = {
       
       await notification.save();
       console.log('Onay bildirimi veritabanına kaydedildi');
-
-      // Socket.IO ile real-time onay bildirimi gönder
-      const socketId = userSockets.get(guest._id.toString());
-      if (socketId) {
-        io.to(socketId).emit('notification', {
-          type: 'new_notification',
-          message: notification.message
-        });
-        console.log('Socket.IO onay bildirimi gönderildi');
-      } else {
-        console.log('Kullanıcı socket bağlantısı bulunamadı');
-      }
 
       console.log('Kafka onay mesajı gönderiliyor...');
       // Kafka'ya bildirim gönder
