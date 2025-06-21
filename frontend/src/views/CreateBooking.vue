@@ -25,7 +25,7 @@
       </div>
       <div v-if="selectedUser" class="form-group">
         <label>Tarih Seç</label>
-        <FullCalendar :options="calendarOptions" class="booking-calendar"/>
+        <FullCalendar :options="calendarOptions" class="booking-calendar mobile-friendly"/>
         <div v-if="dateRange && dateRange.length === 2 && dateRange[0]" class="selected-dates-info">
           <span><strong>Seçilen Aralık:</strong> {{ new Date(dateRange[0]).toLocaleDateString('tr-TR') }} - {{ new Date(dateRange[1]).toLocaleDateString('tr-TR') }}</span>
         </div>
@@ -103,6 +103,24 @@ const calendarOptions = reactive({
   selectOverlap: false,
   select: handleDateSelect,
   events: [],
+  height: 'auto',
+  contentHeight: 'auto',
+  aspectRatio: 1.2,
+  handleWindowResize: true,
+  selectAllow: function(selectInfo) {
+    return new Date(selectInfo.start) >= new Date().setHours(0, 0, 0, 0);
+  },
+  // Touch event'leri etkinleştir
+  touchSupport: true,
+  longPressDelay: 500,
+  eventLongPressDelay: 500,
+  selectLongPressDelay: 500,
+  // Mobil için header toolbar
+  headerToolbar: {
+    left: 'prev',
+    center: 'title',
+    right: 'next'
+    },
   selectAllow: function(selectInfo) {
     return new Date(selectInfo.start) >= new Date().setHours(0, 0, 0, 0);
   },
@@ -272,6 +290,129 @@ const clearSelectedUser = () => {
 .booking-calendar {
   margin-top: 1rem;
   margin-bottom: 1rem;
+}
+.mobile-friendly {
+  touch-action: manipulation; /* Touch event'leri optimize et */
+}
+:deep(.fc-toolbar) {
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 0.5rem;
+}
+
+:deep(.fc-toolbar-title) {
+  font-size: 1.1rem;
+  margin: 0;
+}
+
+:deep(.fc-button) {
+  padding: 0.4rem 0.8rem;
+  font-size: 0.9rem;
+  min-height: 44px; /* Touch target boyutu */
+  min-width: 44px;
+  border-radius: 6px;
+  touch-action: manipulation;
+}
+
+:deep(.fc-daygrid-day) {
+  min-height: 44px; /* Touch target boyutu */
+  cursor: pointer;
+  touch-action: manipulation;
+}
+
+:deep(.fc-daygrid-day-number) {
+  padding: 8px;
+  font-size: 0.9rem;
+  font-weight: 500;
+}
+
+:deep(.fc-day-today) {
+  background-color: #e0f2fe !important;
+}
+
+:deep(.fc-daygrid-day:hover) {
+  background-color: #f0f8ff;
+}
+
+/* Seçim alanı */
+:deep(.fc-highlight) {
+  background-color: #42b983 !important;
+  opacity: 0.3;
+}
+
+/* Mobil responsive */
+@media (max-width: 700px) {
+  .create-booking-container {
+    max-width: 98vw;
+    min-width: 0;
+    padding: 1.2rem 0.8rem;
+    border-radius: 8px;
+  }
+  
+  .booking-calendar {
+    margin-left: -0.3rem;
+    margin-right: -0.3rem;
+  }
+  
+  :deep(.fc-toolbar) {
+    margin-bottom: 0.8rem;
+  }
+  
+  :deep(.fc-toolbar-title) {
+    font-size: 1rem;
+  }
+  
+  :deep(.fc-button) {
+    padding: 0.3rem 0.6rem;
+    font-size: 0.8rem;
+    min-height: 40px;
+    min-width: 40px;
+  }
+  
+  :deep(.fc-daygrid-day) {
+    min-height: 40px;
+  }
+  
+  :deep(.fc-daygrid-day-number) {
+    padding: 6px;
+    font-size: 0.8rem;
+  }
+  
+  h1 {
+    font-size: 1.3rem;
+  }
+  
+  .btn {
+    font-size: 1rem;
+    min-height: 44px; /* Touch target */
+  }
+  
+  .avatar {
+    width: 28px;
+    height: 28px;
+  }
+}
+
+@media (max-width: 480px) {
+  :deep(.fc-toolbar) {
+    flex-direction: column;
+    gap: 0.8rem;
+  }
+  
+  :deep(.fc-toolbar-chunk) {
+    display: flex;
+    justify-content: center;
+    align-items: center;
+  }
+  
+  :deep(.fc-daygrid-day) {
+    min-height: 35px;
+  }
+  
+  :deep(.fc-daygrid-day-number) {
+    font-size: 0.75rem;
+    padding: 4px;
+  }
 }
 .selected-dates-info {
   background-color: #e0f2fe;
