@@ -21,7 +21,7 @@ const bookingSchema = new mongoose.Schema({
   },
   status: {
     type: String,
-    enum: ['pending', 'approved', 'rejected'],
+    enum: ['pending', 'approved', 'rejected', 'cancelled_by_guest', 'cancelled_by_host'],
     default: 'pending'
   },
   message: {
@@ -40,6 +40,14 @@ const bookingSchema = new mongoose.Schema({
     min: 1,
     max: 20,
     default: 1
+  },
+  cancellationReason: {
+    type: String,
+    required: false
+  },
+  cancelledAt: {
+    type: Date,
+    required: false
   },
   createdAt: {
     type: Date,

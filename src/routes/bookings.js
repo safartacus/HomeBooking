@@ -161,4 +161,72 @@ router.get('/availability', auth, async (req, res) => {
   }
 });
 
+// Cancel booking by guest (last 24 hours)
+router.patch('/:id/cancel', auth, async (req, res) => {
+  try {
+    const { reason } = req.body;
+    const booking = await Booking.findById(req.params.id);
+
+    if (!booking) {
+      return res.status(404).json({ message: 'Randevu bulunamadı' });
+    }
+
+    // Check if user is either guest or host
+    const isGuest = booking.guest.toString() === req.user._id.toString();
+    const isHost = booking.host.toString() === req.user._id.toString();
+    
+    if (!isGuest && !isHost) {
+      return res.status(403).json({ message: 'Bu işlem için yetkiniz yok' });
+    }
+
+    // Check if booking is approved
+    if (booking.status !== 'approved') {
+      return res.status(400).json({ message: 'Sadece onaylanmış randevular iptal edilebilir' });
+    }
+
+    // Check if it's more than 24 hours before start date
+    const now = new Date();
+    const startDate = new Date(booking.startDate);
+    const timeDiff = startDate.getTime() - now.getTime();
+    const hoursDiff = timeDiff / (1000 * 3600);
+
+    if (hoursDiff < 0) {
+      return res.status(400).json({ 
+        message: 'Geçmiş randevular iptal edilemez' 
+      });
+    }
+
+    if (hoursDiff <= 24) {
+      return res.status(400).json({ 
+        message: 'Randevu başlangıcından 24 saat öncesine kadar iptal edilebilir. Artık çok geç!' 
+      });
+    }
+
+    // Validate reason
+    if (!reason || reason.trim().length < 10) {
+      return res.status(400).json({ 
+        message: 'İptal nedeni en az 10 karakter olmalıdır' 
+      });
+    }
+
+    // Update booking status and add cancellation info
+    const cancelledBy = isGuest ? 'guest' : 'host';
+    booking.status = isGuest ? 'cancelled_by_guest' : 'cancelled_by_host';
+    booking.cancellationReason = reason.trim();
+    booking.cancelledAt = new Date();
+    await booking.save();
+
+    // Send cancellation notification
+    await notificationService.sendBookingCancellationNotification(booking, cancelledBy);
+
+    res.json({
+      message: `Randevu başarıyla iptal edildi (${isGuest ? 'misafir' : 'ev sahibi'} tarafından)`,
+      booking
+    });
+  } catch (error) {
+    console.error('Randevu iptal hatası:', error);
+    res.status(500).json({ message: 'Randevu iptal edilirken bir hata oluştu' });
+  }
+});
+
 module.exports = router; 
