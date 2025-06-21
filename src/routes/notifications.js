@@ -4,6 +4,7 @@ const jwt = require('jsonwebtoken');
 const Notification = require('../models/Notification');
 const Booking = require('../models/Booking');
 const User = require('../models/User');
+const notificationService = require('../services/kafkaService');
 
 // Middleware to verify JWT token
 const auth = async (req, res, next) => {
@@ -72,6 +73,13 @@ router.post('/:id/booking-action', auth, async (req, res) => {
     if (!booking) return res.status(404).json({ message: 'Randevu bulunamadı' });
     if (booking.host.toString() !== req.user._id.toString()) return res.status(403).json({ message: 'Yetkisiz' });
     booking.status = action;
+    console.log('booking.status', booking.status);
+    if (booking.status === 'approved') {
+      await notificationService.sendBookingApprovalNotification(booking);
+    }
+    if (booking.status === 'rejected') {
+      await notificationService.sendBookingRejectionNotification(booking);
+    }
     await booking.save();
     notification.isRead = true;
     await notification.save();

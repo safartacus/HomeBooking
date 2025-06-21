@@ -1,7 +1,7 @@
+const dotenv = require('dotenv').config();
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const dotenv = require('dotenv').config();
 const path = require('path');
 const http = require('http');
 const { Server } = require('socket.io');
@@ -65,4 +65,4 @@ server.listen(PORT, () => {
 module.exports = { io, userSockets };
 
 // Kafka consumer başlat
-startConsumer().catch(err => console.error('Kafka consumer error:', err)); 
+//startConsumer().catch(err => console.error('Kafka consumer error:', err)); 
