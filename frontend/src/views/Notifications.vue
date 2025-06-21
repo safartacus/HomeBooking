@@ -70,7 +70,7 @@ const formatDate = (date) => {
 }
 
 const getStatusText = (status) => {
-  const map = { pending: 'Beklemede', approved: 'Onaylandı', rejected: 'Reddedildi' }
+  const map = { pending: 'Beklemede', approved: 'Onaylandı', rejected: 'Reddedildi', cancelled_by_guest: 'Misafir İptal Etti', cancelled_by_host: 'Ev Sahibi İptal Etti' }
   return map[status] || status
 }
 
@@ -162,6 +162,14 @@ h1 {
   color: #fff;
 }
 .status.rejected {
+  background: #dc3545;
+  color: #fff;
+}
+.status.cancelled_by_guest {
+  background: #dc3545;
+  color: #fff;
+}
+.status.cancelled_by_host {
   background: #dc3545;
   color: #fff;
 }
