@@ -113,7 +113,6 @@ router.patch('/:id', auth, async (req, res) => {
 
     // Update status
     booking.status = status;
-    console.log('booking', booking.status);
     await booking.save();
     // Send notification
     if (status === 'approved') {

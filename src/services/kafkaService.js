@@ -48,7 +48,6 @@ const notificationService = {
   async connect() {
     try {
       await producer.connect();
-      console.log('Connected to Kafka');
     } catch (error) {
       console.error('Kafka connection error:', error);
       console.error('Kafka connection error stack:', error.stack);
@@ -116,7 +115,6 @@ const notificationService = {
 
   async sendBookingApprovalNotification(booking) {
     try {
-      console.log('sendBookingApprovalNotification çağrıldı, booking:', booking);
       // Randevu oluşturan kişiyi bul
       const guest = await User.findById(booking.guest);
       if (!guest) {
@@ -138,7 +136,6 @@ const notificationService = {
         message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
         booking: booking._id
       });
-      console.log('booking_approved notification kaydedilecek:', notification);
       await notification.save();
 
 
@@ -188,7 +185,6 @@ const notificationService = {
         message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
         booking: booking._id
       });
-      console.log('booking_rejected notification kaydedilecek:', notification);
       await notification.save();
 
 
