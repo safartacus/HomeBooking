@@ -48,7 +48,6 @@ const notificationService = {
   async connect() {
     try {
       await producer.connect();
-      console.log('Connected to Kafka');
     } catch (error) {
       console.error('Kafka connection error:', error);
       console.error('Kafka connection error stack:', error.stack);
@@ -106,15 +105,6 @@ const notificationService = {
 
       await sendEmail(recipient.email, 'Yeni Randevu İsteği', emailHtml);
 
-      // WhatsApp bildirimi gönder (opsiyonel) - Şimdilik devre dışı
-      /*
-      if (recipient.phone) {
-        await sendWhatsApp(
-          recipient.phone,
-          `Yeni randevu isteği: ${guest.username} size ${booking.guestCount} kişi ile randevu oluşturdu. Detaylar için e-postanızı kontrol edin.`
-        );
-      }
-      */
       
     } catch (error) {
       console.error('=== sendBookingNotification HATASI ===');
@@ -125,7 +115,6 @@ const notificationService = {
 
   async sendBookingApprovalNotification(booking) {
     try {
-      console.log('sendBookingApprovalNotification çağrıldı, booking:', booking);
       // Randevu oluşturan kişiyi bul
       const guest = await User.findById(booking.guest);
       if (!guest) {
@@ -147,16 +136,8 @@ const notificationService = {
         message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
         booking: booking._id
       });
-      console.log('booking_approved notification kaydedilecek:', notification);
       await notification.save();
 
-      // Kafka'ya bildirim gönder
-      await producer.send({
-        topic: 'notifications',
-        messages: [
-          { value: JSON.stringify({ userId: guest._id }) }
-        ]
-      });
 
       // E-posta gönder
       const emailHtml = `
@@ -174,18 +155,58 @@ const notificationService = {
 
       await sendEmail(guest.email, 'Randevu Onaylandı', emailHtml);
 
-      // WhatsApp bildirimi gönder (opsiyonel) - Şimdilik devre dışı
-      /*
-      if (guest.phone) {
-        await sendWhatsApp(
-          guest.phone,
-          `Randevunuz onaylandı: ${host.username} randevunuzu onayladı. Detaylar için e-postanızı kontrol edin.`
-        );
-      }
-      */
       
     } catch (error) {
       console.error('=== sendBookingApprovalNotification HATASI ===');
+      console.error('Hata detayı:', error);
+      console.error('Hata stack:', error.stack);
+    }
+  },
+  async sendBookingRejectionNotification(booking) {
+    try {
+      // Randevu oluşturan kişiyi bul
+      const guest = await User.findById(booking.guest);
+      if (!guest) {
+        console.error('sendBookingRejectionNotification: Guest not found for booking:', booking._id);
+        return;
+      }
+
+      // Ev sahibini bul
+      const host = await User.findById(booking.host);
+      if (!host) {
+        console.error('sendBookingRejectionNotification: Host not found for booking:', booking._id);
+        return;
+      }
+
+      // Bildirim oluştur
+      const notification = new Notification({
+        user: guest._id,
+        type: 'booking_rejected',
+        message: `${host.username}, ${new Date(booking.startDate).toLocaleDateString('tr-TR')} - ${new Date(booking.endDate).toLocaleDateString('tr-TR')} arası için olan randevunuzu onayladı.`,
+        booking: booking._id
+      });
+      await notification.save();
+
+
+      // E-posta gönder
+      const emailHtml = `
+        <h1>Randevu Reddedildi</h1>
+        <p>${host.username} randevunuzu reddetti.</p>
+        <p>Randevu Detayları:</p>
+        <ul>
+          <li>Başlangıç: ${new Date(booking.startDate).toLocaleDateString('tr-TR')}</li>
+          <li>Bitiş: ${new Date(booking.endDate).toLocaleDateString('tr-TR')}</li>
+          <li>Misafir Sayısı: ${booking.guestCount} kişi</li>
+          <li>Mesaj: ${booking.message}</li>
+        </ul>
+        <p>Randevuyu görüntülemek için <a href="${process.env.FRONTEND_URL}/bookings">tıklayın</a>.</p>
+      `;
+
+      await sendEmail(guest.email, 'Randevu Reddedildi', emailHtml);
+
+      
+    } catch (error) {
+      console.error('=== sendBookingRejectionNotification HATASI ===');
       console.error('Hata detayı:', error);
       console.error('Hata stack:', error.stack);
     }
